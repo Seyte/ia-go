@@ -18,17 +18,17 @@ class myPlayer(PlayerInterface):
     to translate them to the GO-move strings "A1", ..., "J8", "PASS". Easy!
 
     '''
-    
+    MAX_VALUE = 10000
+
     # simplest heuristic possible for this game.
-    def heuristic(self,board,is_friendly): 
-        # is_friendly move = 1 if true, -1 if false.
+    def heuristic(self,board): 
         #Black make the first move.
         scores = board.compute_score() # BLACK / WHITE
         match self._mycolor:
             case Goban.Board._BLACK:
-                return (scores[0]-scores[1])*is_friendly
+                return (scores[0]-scores[1])
             case Goban.Board._WHITE:
-                return (scores[1]-scores[0])*is_friendly
+                return (scores[1]-scores[0])
             case _: #shouldn't go in there. fallback.
                 return 0
     
@@ -40,6 +40,18 @@ class myPlayer(PlayerInterface):
 
     def getRoundTime(self):
         return min(10,(1800-self._play_time)/100)
+    
+    def getWinnerColor(self,board):
+        result = board.result()
+        if result == "1-0":
+            if (self._mycolor == Goban.Board._WHITE):
+                return self.MAX_VALUE
+            return -self.MAX_VALUE
+        elif result == "0-1":
+            if (self._mycolor == Goban.Board._BLACK):
+                return self.MAX_VALUE
+            return -self.MAX_VALUE
+        return 0
     
     def getBoardCopy(self):
         board = Goban.Board()
@@ -93,7 +105,9 @@ class myPlayer(PlayerInterface):
     
     def simulateFriendlyMove(self,board,current_depth,max_depth,alpha,beta):
         if (current_depth>=max_depth or board._gameOver):
-            return self.heuristic(board,1),None
+            if (board._gameOver):
+                return self.getWinnerColor(board)
+            return self.heuristic(board),None
         best_move = None
         for l in board.generate_legal_moves() :
             board.push(l)
@@ -109,7 +123,9 @@ class myPlayer(PlayerInterface):
 
     def simulateEnnemyMove(self,board,current_depth,max_depth,alpha,beta):
         if (current_depth>=max_depth or board._gameOver):
-            return self.heuristic(board,-1),None
+            if (board._gameOver):
+                return self.getWinnerColor(board)
+            return self.heuristic(board),None
 
         best_move = None
         for l in board.generate_legal_moves() :
