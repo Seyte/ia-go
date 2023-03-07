@@ -11,6 +11,7 @@ from random import choice
 from playerInterface import *
 import signal
 import copy 
+import enum
 
 class myPlayer(PlayerInterface):
     ''' Example of a random player for the go. The only tricky part is to be able to handle
@@ -19,6 +20,10 @@ class myPlayer(PlayerInterface):
 
     '''
     MAX_VALUE = 10000
+
+    class Strategy_Phase(enum.Enum):
+        First_Phase = 1
+        MinMax_Phase = 2
 
     # simplest heuristic possible for this game.
     def heuristic(self,board): 
@@ -37,6 +42,7 @@ class myPlayer(PlayerInterface):
         self._mycolor = None
         self._last_best_move = None
         self._play_time = 1 # to cover additional time we can't mesure.
+        self._phase = self.Strategy_Phase.MinMax_Phase # TODO : change this
 
     def getRoundTime(self):
         return min(10,(1800-self._play_time)/100)
@@ -142,34 +148,35 @@ class myPlayer(PlayerInterface):
             return a[1]
     
     def getPlayerMove(self):
-        currentTime = time.time()
-        if self._board.is_game_over():
-            print("Referee told me to play but the game is over!")
-            return "PASS" 
-        
-        moves = self._board.legal_moves() # Dont use weak_legal_moves() here!
-        self._last_best_move = choice(moves) 
-        max_depth = 1
-        original_sigalarm_handler = None
-        try :
-            original_sigalarm_handler = signal.signal(signal.SIGALRM, self.handler)
-            while(True):
-                signal.alarm(self.getRoundTime())
-                self._last_best_move = self.start_deep(copy.deepcopy(self._board),0,max_depth)
-                max_depth+=1
-        except TimeoutError:
-            pass # if we do not use iterative deepening.
-        finally:
-            print("I got to explore until " + str(max_depth-1))
-            self._board.push(self._last_best_move)
-            # New here: allows to consider internal representations of moves
-            print("I am playing ", self._board.move_to_str(self._last_best_move))
-            print("My current board :")
-            self._board.prettyPrint()
-            self._play_time += time.time() - currentTime
-            print("Player time = " + str(self._play_time))
-            # move is an internal representation. To communicate with the interface I need to change if to a string
-            return Goban.Board.flat_to_name(self._last_best_move) 
+        if(self._phase == self.Strategy_Phase.MinMax_Phase):
+            currentTime = time.time()
+            if self._board.is_game_over():
+                print("Referee told me to play but the game is over!")
+                return "PASS" 
+            
+            moves = self._board.legal_moves() # Dont use weak_legal_moves() here!
+            self._last_best_move = choice(moves) 
+            max_depth = 1
+            original_sigalarm_handler = None
+            try :
+                original_sigalarm_handler = signal.signal(signal.SIGALRM, self.handler)
+                while(True):
+                    signal.alarm(self.getRoundTime())
+                    self._last_best_move = self.start_deep(copy.deepcopy(self._board),0,max_depth)
+                    max_depth+=1
+            except TimeoutError:
+                pass # if we do not use iterative deepening.
+            finally:
+                print("I got to explore until " + str(max_depth-1))
+                self._board.push(self._last_best_move)
+                # New here: allows to consider internal representations of moves
+                print("I am playing ", self._board.move_to_str(self._last_best_move))
+                print("My current board :")
+                self._board.prettyPrint()
+                self._play_time += time.time() - currentTime
+                print("Player time = " + str(self._play_time))
+                # move is an internal representation. To communicate with the interface I need to change if to a string
+                return Goban.Board.flat_to_name(self._last_best_move) 
 
 
     def playOpponentMove(self, move):
