@@ -22,15 +22,15 @@ class myPlayer(PlayerInterface):
 
     # simplest heuristic possible for this game.
     def heuristic(self,board): 
+        return self.heuristique_complexe(board)
         #Black make the first move.
         scores = board.compute_score() # BLACK / WHITE
-        match self._mycolor:
-            case Goban.Board._BLACK:
-                return (scores[0]-scores[1])
-            case Goban.Board._WHITE:
-                return (scores[1]-scores[0])
-            case _: #shouldn't go in there. fallback.
-                return 0
+        if (self._mycolor == Goban.Board._BLACK):
+            return (scores[0]-scores[1])
+        elif (self._mycolor == Goban.Board._WHITE):
+            return (scores[1]-scores[0])
+        else: #shouldn't go in there. fallback.
+            return 0
     
     def __init__(self):
         self._board = Goban.Board()
@@ -62,24 +62,20 @@ class myPlayer(PlayerInterface):
     def getPlayerName(self):
         return "MinimaxPlayer"
 
-    def heuristique_simple(self):
+    def heuristique_simple(self,board):
         assert(self._mycolor != None)
-        result = self._board.diff_stones_board() + 2*self._board.diff_stones_captured()
+        result = board.diff_stones_board() + 2*board.diff_stones_captured()
         if (self._mycolor == Goban.Board._BLACK):
             return result
         elif (self._mycolor == Goban.Board._WHITE):
             return -result
         return 0
     
-    def heuristique_complexe(self):
+    def heuristique_complexe(self,board):
         assert(self._mycolor != None)
-        array = self._board.get_board()
+        array = board.get_board()
         holes_in_black = 0
         holes_in_white = 0
-        print(array)
-        array[1] = Goban.Board._BLACK
-        array[9] = Goban.Board._BLACK
-        print(array)
         for i in range(9):
             for j in range(9):
                 if (array[i+9*j] == Goban.Board._EMPTY):
@@ -95,9 +91,9 @@ class myPlayer(PlayerInterface):
                         holes_in_white += 1
         result = holes_in_black - holes_in_white
         if (self._mycolor == Goban.Board._BLACK):
-            return 3*result + self.heuristique_simple()
+            return 2*result + self.heuristique_simple(board)
         elif (self._mycolor == Goban.Board._WHITE):
-            return -3*result + self.heuristique_simple()
+            return -2*result + self.heuristique_simple(board)
         return 0
         
     def handler(self,signum, frame):
