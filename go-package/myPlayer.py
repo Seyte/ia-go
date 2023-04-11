@@ -7,11 +7,12 @@ Right now, this class contains the copy of the randomPlayer. But you have to cha
 
 import time
 import Goban 
-from random import choice
+from random import choice, randint
 from playerInterface import *
 import signal
 import copy 
 import enum
+import sys
 
 class myPlayer(PlayerInterface):
     ''' Example of a random player for the go. The only tricky part is to be able to handle
@@ -23,26 +24,29 @@ class myPlayer(PlayerInterface):
 
     class Strategy_Phase(enum.Enum):
         First_Phase = 1
-        MinMax_Phase = 2
+        Early_Game_Phase = 2
+        MinMax_Phase = 3
 
     # simplest heuristic possible for this game.
-    def heuristic(self,board): 
-        return self.heuristique_complexe(board)
+    def heuristic(self,board):
+        # sys.stderr.write("\n" + str(self.heuristique_complexe(board)) + "\n")
+        return self.heuristique_simple(board)
         #Black make the first move.
         scores = board.compute_score() # BLACK / WHITE
-        if (self._mycolor == Goban.Board._BLACK):
-            return (scores[0]-scores[1])
-        elif (self._mycolor == Goban.Board._WHITE):
-            return (scores[1]-scores[0])
-        else: #shouldn't go in there. fallback.
-            return 0
+        match self._mycolor:
+            case Goban.Board._BLACK:
+                return (scores[0]-scores[1])
+            case Goban.Board._WHITE:
+                return (scores[1]-scores[0])
+            case _: #shouldn't go in there. fallback.
+                return 0
     
     def __init__(self):
         self._board = Goban.Board()
         self._mycolor = None
         self._last_best_move = None
         self._play_time = 1 # to cover additional time we can't mesure.
-        self._phase = self.Strategy_Phase.MinMax_Phase # TODO : change this
+        self._phase = self.Strategy_Phase.First_Phase # TODO : change this
 
     def getRoundTime(self):
         return min(10,(1800-self._play_time)/100)
@@ -65,12 +69,35 @@ class myPlayer(PlayerInterface):
             board.push(move)
         return board
     
+    def get_moves_from_center(self, x):
+        assert(x >= 0)
+        moves = self._board.generate_legal_moves()
+        if (x >= 4):
+            return moves
+        lines = ["A", "B", "C", "D", "E", "F", "G", "H", "J"]
+        for i in range(9):
+            for j in range(4-x):
+                to_be_removed = [j + 9*(i+1),
+                                 (8-j) + 9*(i+1),
+                                 i + 9*j,
+                                 i + 9*(8-j)]
+                                #  [lines[j]+str(i+1),
+                                #  lines[8-j]+str(i+1),
+                                #  lines[i]+str(j),
+                                #  lines[i]+str(8-j)]
+                for m in to_be_removed:
+                    if m in moves:
+                        moves.remove(m)
+        # sys.stderr.write(str(moves))
+        # assert(False)
+        return moves
+    
     def getPlayerName(self):
         return "MinimaxPlayer"
 
     def heuristique_simple(self,board):
         assert(self._mycolor != None)
-        result = board.diff_stones_board() + 2*board.diff_stones_captured()
+        result = 10*board.diff_stones_board() - 5*board.diff_stones_captured()
         if (self._mycolor == Goban.Board._BLACK):
             return result
         elif (self._mycolor == Goban.Board._WHITE):
@@ -97,9 +124,9 @@ class myPlayer(PlayerInterface):
                         holes_in_white += 1
         result = holes_in_black - holes_in_white
         if (self._mycolor == Goban.Board._BLACK):
-            return 2*result + self.heuristique_simple(board)
+            return result + self.heuristique_simple(board)
         elif (self._mycolor == Goban.Board._WHITE):
-            return -2*result + self.heuristique_simple(board)
+            return -result + self.heuristique_simple(board)
         return 0
         
     def handler(self,signum, frame):
@@ -147,20 +174,91 @@ class myPlayer(PlayerInterface):
             a = self.simulateFriendlyMove(board,current_depth,max_depth,-5000,5000)
             return a[1]
     
+    def playFirstPhase(self):
+        assert(self._mycolor != None)
+        moves_history = self._board._historyMoveNames
+        match self._mycolor:
+            case Goban.Board._BLACK:
+                match self._board._nbBLACK:
+                    case 0:
+                        self._phase = self.Strategy_Phase.Early_Game_Phase
+                        return "E5"
+                    # case 1:
+                    #     self._phase = self.Strategy_Phase.MinMax_Phase
+                    #     match moves_history[0]:
+                    #         case "D5" | "E7" | "G5" | "E3":
+                    #             return "E4"
+                    #         case _:
+                    #             return "PASS" # à changer
+                    case _:
+                        self._phase = self.Strategy_Phase.Early_Game_Phase
+                        return "PASS"
+            case Goban.Board._WHITE:
+                match self._board._nbWHITE:
+                    case 0:
+                        self._phase = self.Strategy_Phase.Early_Game_Phase
+                        match moves_history[0]:
+                            # au centre
+                            case "E5":
+                                return "G5"
+                            # en diagonale en partant du centre
+                            case "D4" | "C3":
+                                return "F6"
+                            case "F4" | "G3":
+                                return "D6"
+                            case "D6" | "C7":
+                                return "F4"
+                            case "F6" | "G7":
+                                return "D4"
+                            # en ligne droite ou en L en partant du centre
+                            case "D3" | "E3" | "F3" | "E4":
+                                return "E6"
+                            case "G4" | "G5" | "G6" | "F5":
+                                return "D5"
+                            case "D7" | "E7" | "F7" | "E6":
+                                return "E4"
+                            case "C4" | "C5" | "C6" | "D5":
+                                return "F5"
+                            # si le premier joueur n'a pas joué dans la zone centrale
+                            case _:
+                                return "E5"
+                    # case 1:
+                    #     self._phase = self.Strategy_Phase.MinMax_Phase
+                    #     return "A9"
+                    case _:
+                        self._phase = self.Strategy_Phase.Early_Game_Phase
+                        return "PASS"
+            case _: #shouldn't go in there. fallback.
+                return 0
+        return "PASS"
+
     def getPlayerMove(self):
-        if(self._phase == self.Strategy_Phase.MinMax_Phase):
+        if (self._phase == self.Strategy_Phase.First_Phase):
+            best_move = self.playFirstPhase()
+            self._board.push(Goban.Board.name_to_flat(best_move))
+            return best_move
+        # if (self._phase == self.Strategy_Phase.MinMax_Phase):
+        else:
             currentTime = time.time()
             if self._board.is_game_over():
                 print("Referee told me to play but the game is over!")
                 return "PASS" 
             
-            moves = self._board.legal_moves() # Dont use weak_legal_moves() here!
+            if (self._phase == self.Strategy_Phase.Early_Game_Phase):
+                moves = self.get_moves_from_center(2)
+                if (len(moves) <= 17):
+                    # sys.stderr.write(str(moves))
+                    # assert(False)
+                    self._phase = self.Strategy_Phase.MinMax_Phase
+            elif (self._phase == self.Strategy_Phase.MinMax_Phase):
+                moves = self._board.legal_moves() # Dont use weak_legal_moves() here!
             self._last_best_move = choice(moves) 
             max_depth = 1
             original_sigalarm_handler = None
             try :
                 original_sigalarm_handler = signal.signal(signal.SIGALRM, self.handler)
                 while(True):
+                    # sys.stderr.write(str(self._last_best_move) + "\n")
                     signal.alarm(self.getRoundTime())
                     self._last_best_move = self.start_deep(copy.deepcopy(self._board),0,max_depth)
                     max_depth+=1
@@ -176,8 +274,9 @@ class myPlayer(PlayerInterface):
                 self._play_time += time.time() - currentTime
                 print("Player time = " + str(self._play_time))
                 # move is an internal representation. To communicate with the interface I need to change if to a string
+                sys.stderr.write("\n" + Goban.Board.flat_to_name(self._last_best_move) + "\n")
+                assert(Goban.Board.flat_to_name(self._last_best_move) != "PASS")
                 return Goban.Board.flat_to_name(self._last_best_move) 
-
 
     def playOpponentMove(self, move):
         print("Opponent played ", move) # New here
