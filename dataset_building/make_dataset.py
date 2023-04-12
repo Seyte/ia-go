@@ -10,12 +10,16 @@ import subprocess
 import Goban 
 import gnugoPlayer
 from io import StringIO
+file = None
 
-
-def add_to_json(board, result, file_name="tmp.json"):
+def add_to_json(board, result, file_name=file):
     is_empty = False
     json_list = []
-    read_file = open(file_name, "r")
+    read_file = None
+    try:
+        read_file = open(file_name, "x")
+    except FileExistsError:
+        read_file = open(file_name, "r")
     try:
         json_list = json.loads(read_file.read())
     except:
@@ -29,7 +33,7 @@ def add_to_json(board, result, file_name="tmp.json"):
         json.dump(json_list, write_file)
         write_file.close()
 
-def data_to_json(board_list, result_list, file_name="tmp.json"):
+def data_to_json(board_list, result_list, file_name=file):
     json_list = []
     for i in range(len(board_list)):
         json_list.append({"in": board_list[i], "out": result_list[i]})
@@ -220,24 +224,21 @@ def add_sample(output_file, nb_moves, to_move, has_passed=False, nb_games=1000):
     proba = generate_black_win_probability(b, nb_games)
     add_to_json(b, proba, output_file)
 
-games_per_board = 1000
+games_per_board = 3
 samples_per_nb_moves = 100
 range_from = 0
 range_to = 1
-file = None
 
-if (len(sys.argv)<4):
+if (len(sys.argv)<3):
     print("Arguments missing, verify your command")
-    print("Format : make_dataset.py <file> <nb_sample_per_it> <range_from> <range_to>")
+    print("Format : make_dataset.py <file> <range_from> <range_to>")
     exit()
 else:
     file = str(sys.argv[1])
-    samples_per_nb_moves = int(sys.argv[2])
-    range_from = int(sys.argv[3])
-    range_to = int(sys.argv[4])
+    range_from = int(sys.argv[2])
+    range_to = int(sys.argv[3])
 
-
-for nb_moves in range(range_from,range_to):
-    for _ in range(samples_per_nb_moves):
-        add_sample("tmp.json", nb_moves, Goban.Board._BLACK, nb_games=games_per_board)
-        add_sample("tmp.json", nb_moves, Goban.Board._WHITE, nb_games=games_per_board)
+while(True):
+    for nb_moves in range(range_from,range_to):
+        add_sample(file, nb_moves, Goban.Board._BLACK, nb_games=games_per_board)
+        add_sample(file, nb_moves, Goban.Board._WHITE, nb_games=games_per_board)
