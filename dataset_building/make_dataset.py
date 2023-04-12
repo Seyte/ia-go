@@ -79,7 +79,7 @@ def board_to_goban_and_players(my_board):
                 custom_play_move(white_pos.pop())
     else:
         while ((len(black_pos) > 1) or (len(white_pos) > 0)):
-            if (len(black_pos) < len(white_pos)+1):
+            if ((len(black_pos) < len(white_pos)+1) or (len(black_pos) <= 1)):
                 custom_play_move(-1)
             else:
                 custom_play_move(black_pos.pop())
@@ -216,12 +216,19 @@ def generate_black_win_probability(board, nb_games=1000):
             nb_errors += 1
             sys.stderr.write(" : Erreur\n")
             time.sleep(1)
+            return -1
     sys.stderr.write(f"\r{nb_games} parties effectuées, {nb_errors} échec(s)\n")
     return total_wins/nb_games
 
 def add_sample(output_file, nb_moves, to_move, has_passed=False, nb_games=1000):
     b = generate_single_board(nb_moves, to_move, has_passed)
-    proba = generate_black_win_probability(b, nb_games)
+    proba = -1
+    tries = 0
+    while (proba == -1):
+        tries += 1
+        if (tries >= 10):
+            return
+        proba = generate_black_win_probability(b, nb_games)
     add_to_json(b, proba, output_file)
 
 games_per_board = 3
@@ -229,7 +236,7 @@ samples_per_nb_moves = 100
 range_from = 0
 range_to = 1
 
-if (len(sys.argv)<3):
+if (len(sys.argv)<4):
     print("Arguments missing, verify your command")
     print("Format : make_dataset.py <file> <range_from> <range_to>")
     exit()
