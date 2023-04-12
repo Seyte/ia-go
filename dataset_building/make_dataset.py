@@ -220,8 +220,24 @@ def add_sample(output_file, nb_moves, to_move, has_passed=False, nb_games=1000):
     proba = generate_black_win_probability(b, nb_games)
     add_to_json(b, proba, output_file)
 
+games_per_board = 1000
+samples_per_nb_moves = 100
+range_from = 0
+range_to = 1
+file = None
 
-games_per_board = 3
-for i in range(3):
-    add_sample("tmp.json", 10, Goban.Board._BLACK, nb_games=games_per_board)
-    add_sample("tmp.json", 10, Goban.Board._WHITE, nb_games=games_per_board)
+if (len(sys.argv)<4):
+    print("Arguments missing, verify your command")
+    print("Format : make_dataset.py <file> <nb_sample_per_it> <range_from> <range_to>")
+    exit()
+else:
+    file = str(sys.argv[1])
+    samples_per_nb_moves = int(sys.argv[2])
+    range_from = int(sys.argv[3])
+    range_to = int(sys.argv[4])
+
+
+for nb_moves in range(range_from,range_to):
+    for _ in range(samples_per_nb_moves):
+        add_sample("tmp.json", nb_moves, Goban.Board._BLACK, nb_games=games_per_board)
+        add_sample("tmp.json", nb_moves, Goban.Board._WHITE, nb_games=games_per_board)
