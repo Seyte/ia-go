@@ -12,13 +12,13 @@ import gnugoPlayer
 from io import StringIO
 
 
-def data_to_json(board_list, result_list):
+def data_to_json(board_list, result_list, file_name="tmp.json"):
     json_list = []
     for i in range(len(board_list)):
         json_list.append({"in": board_list[i], "out": result_list[i]})
-    write_file = open("tmp.json", "w")
+    write_file = open(file_name, "w")
     json.dump(json_list, write_file)
-    close(write_file)
+    write_file.close()
 
 def board_to_goban_and_players(my_board):
     b = my_board["board"]
@@ -47,7 +47,7 @@ def board_to_goban_and_players(my_board):
             if (b[i][j][1] == 1):
                 white_pos.append(i + 9*j)
     if (my_board["to_move"] == Goban.Board._BLACK):
-        while ((len(black_pos) != 0) or (len(white_pos) != 0)):
+        while ((len(black_pos) > 0) or (len(white_pos) > 0)):
             if (len(black_pos) < len(white_pos)):
                 custom_play_move(-1)
             else:
@@ -57,7 +57,7 @@ def board_to_goban_and_players(my_board):
             else:
                 custom_play_move(white_pos.pop())
     else:
-        while ((len(black_pos) != 0) or (len(white_pos) != 0)):
+        while ((len(black_pos) > 1) or (len(white_pos) > 0)):
             if (len(black_pos) < len(white_pos)+1):
                 custom_play_move(-1)
             else:
@@ -208,7 +208,7 @@ def generate_black_win_probability(board, nb_games=1000):
     print(f"\r{nb_games} parties effectuées, {nb_errors} échec(s)\n")
     return total_wins/nb_games
 
-boards = generate_boards(1, 5, 5)
+boards = generate_boards(2, 5, 5)
 # g1 = board_to_goban(boards[0])
 # g2 = board_to_goban(boards[1])
 # g1.pretty_print()
@@ -216,6 +216,7 @@ boards = generate_boards(1, 5, 5)
 # print(generate_black_win_probability(boards[0], 10))
 
 probabilities = []
+# assert(False)
 for b in boards:
-    probabilities.append(generate_black_win_probability(b))
+    probabilities.append(generate_black_win_probability(b, 3))
 data_to_json(boards, probabilities)
