@@ -18,6 +18,7 @@ def add_to_json(board, result, file_name="tmp.json"):
     read_file = open(file_name, "r")
     try:
         json_list = json.loads(read_file.read())
+        print(len(json_list))
     except:
         is_empty = True
     read_file.close()
@@ -90,28 +91,39 @@ def board_to_goban_and_players(my_board):
         p._board = copy.deepcopy(g)
     return (g, players)
 
-def generate_single_board(nb_moves, to_move, has_passed=False):
+def generate_single_board(nb_white, nb_black, to_move, has_passed=False):
     ret = {}
-    b = Goban.Board()
-    if (to_move == Goban.Board._WHITE):
-        b.play_move(-1)
-    for _ in range(nb_moves):
-        to_move = random.choice(b.legal_moves())
-        b.push(to_move)
-        if b._gameOver:
-            sys.stderr.write("Error (handled) : game already over\n")
-            return generate_single_board(nb_moves, to_move, has_passed)
-    arr = b._board
+    # board = np.zeros((9,9,2))
     board = [[[0 for color in range(2)] for j in range(9)] for i in range(9)]
-    for i in range(9):
-        for j in range(9):
-            if (arr[i+9*j] == Goban.Board._BLACK):
-                board[i][j][0] = 1
-            if (arr[i+9*j] == Goban.Board._WHITE):
-                board[i][j][1] = 1
+    for b in range(nb_black):
+        pos = random.randint(0, 81-1-b)
+        while ((board[pos%9][pos//9][0] != 0) or (board[pos%9][pos//9][1] != 0)):
+            pos += 1
+        board[pos%9][pos//9][0] = 1
+    for w in range(nb_white):
+        pos = random.randint(0, 81-nb_black-w)
+        while ((board[pos%9][pos//9][0] != 0) or (board[pos%9][pos//9][1] != 0)):
+            pos += 1
+        board[pos%9][pos//9][1] = 1
     ret["board"] = board
     ret["to_move"] = to_move
     ret["has_passed"] = has_passed
+    return ret
+
+def generate_boards(n, nb_white=-1, nb_black=-1):
+    assert(n > 0)
+    if (nb_white == -1):
+        nb_white = random.randint(3,70)
+    if (nb_black == -1):
+        nb_black = random.randint(3,70)
+    ret = []
+    for i in range(n):
+        if (i%2 == 0):
+            ret.append(generate_single_board(nb_white, nb_black, Goban.Board._BLACK, False))
+        else:
+            ret.append(generate_single_board(nb_white, nb_black, Goban.Board._WHITE, False))
+        # ret.append(generate_single_board(nb_white, nb_black, Goban.Board._BLACK, True))
+        # ret.append(generate_single_board(nb_white, nb_black, Goban.Board._WHITE, True))
     return ret
 
 def generate_one_outcome(my_board):
@@ -215,13 +227,25 @@ def generate_black_win_probability(board, nb_games=1000):
     sys.stderr.write(f"\r{nb_games} parties effectuées, {nb_errors} échec(s)\n")
     return total_wins/nb_games
 
-def add_sample(output_file, nb_moves, to_move, has_passed=False, nb_games=1000):
-    b = generate_single_board(nb_moves, to_move, has_passed)
+def add_sample(output_file, nb_white, nb_black, to_move, has_passed=False, nb_games=1000):
+    b = generate_single_board(nb_white, nb_black, to_move, has_passed)
     proba = generate_black_win_probability(b, nb_games)
     add_to_json(b, proba, output_file)
 
 
+# boards = generate_boards(3, 5, 5)
+# # g1 = board_to_goban(boards[0])
+# # g2 = board_to_goban(boards[1])
+# # g1.pretty_print()
+# # g2.pretty_print()
+# # print(generate_black_win_probability(boards[0], 10))
+
+# probabilities = []
+# # assert(False)
+# for b in boards:
+#     probabilities.append(generate_black_win_probability(b, 10))
+# data_to_json(boards, probabilities)
 games_per_board = 3
 for i in range(3):
-    add_sample("tmp.json", 10, Goban.Board._BLACK, nb_games=games_per_board)
-    add_sample("tmp.json", 10, Goban.Board._WHITE, nb_games=games_per_board)
+    add_sample("tmp.json", 5, 5, Goban.Board._BLACK, nb_games=games_per_board)
+    add_sample("tmp.json", 5, 5, Goban.Board._WHITE, nb_games=games_per_board)
