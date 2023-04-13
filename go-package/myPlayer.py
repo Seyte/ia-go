@@ -5,9 +5,9 @@ from playerInterface import *
 import signal
 import copy 
 import enum
-import sys
 from tensorflow.keras.models import load_model
 import numpy as np
+import os
 
 class myPlayer(PlayerInterface):
     MAX_VALUE = 10000
@@ -18,7 +18,11 @@ class myPlayer(PlayerInterface):
         MinMax_Phase = 3
 
     def heuristic(self,board):
-        signal.siginterrupt(signal.SIGALRM, False)
+        sigset = signal.sigset_t()
+        sigset.add(signal.SIGALRM)
+        oldset = signal.sigprocmask(signal.SIG_BLOCK, sigset)
+        if board.is_game_over():
+            return self.getWinnerColor(board)
         print(board.get_board().shape)
         input_data = board.get_board()
         board_to_predict = np.zeros((11, 11, 2))
@@ -34,7 +38,7 @@ class myPlayer(PlayerInterface):
             value = self._model.predict(board_to_predict)[0][0]
         else :
             value = self._model.predict(board_to_predict)[0][1]
-        signal.siginterrupt(signal.SIGALRM, True)
+        signal.sigprocmask(signal.SIG_SETMASK, oldset)
         return value
     
     def __init__(self):
@@ -44,6 +48,7 @@ class myPlayer(PlayerInterface):
         self._play_time = 1 # to cover additional time we can't mesure.
         self._phase = self.Strategy_Phase.First_Phase # TODO : change this
         self._model = load_model("my_model") # load Keras model
+        self._pid = os.getpid()
 
     def getRoundTime(self):
         return min(10,(1800-self._play_time)/100)
@@ -93,6 +98,7 @@ class myPlayer(PlayerInterface):
         if (current_depth>=max_depth or board._gameOver):
             if (board._gameOver):
                 return self.getWinnerColor(board)
+            
             return self.heuristic(board),None
         best_move = None
         for l in board.generate_legal_moves() :
