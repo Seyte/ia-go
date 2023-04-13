@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+''' This is the file you have to modify for the tournament. Your default AI player must be called by this module, in the
+myPlayer class.
+
+Right now, this class contains the copy of the randomPlayer. But you have to change this!
+'''
+
 import time
 import Goban 
 from random import choice, randint
@@ -9,7 +16,15 @@ import sys
 from tensorflow.keras.models import load_model
 import numpy as np
 
+class CustomException(Exception):
+    pass
+
 class myPlayer(PlayerInterface):
+    ''' Example of a random player for the go. The only tricky part is to be able to handle
+    the internal representation of moves given by legal_moves() and used by push() and 
+    to translate them to the GO-move strings "A1", ..., "J8", "PASS". Easy!
+
+    '''
     MAX_VALUE = 10000
 
     class Strategy_Phase(enum.Enum):
@@ -17,36 +32,29 @@ class myPlayer(PlayerInterface):
         Early_Game_Phase = 2
         MinMax_Phase = 3
 
+    # simplest heuristic possible for this game.
     def heuristic(self,board):
-        signal.siginterrupt(signal.SIGALRM, False)
-        print(board.get_board().shape)
-        input_data = board.get_board()
-        board_to_predict = np.zeros((11, 11, 2))
-        for x in range (9):
-            for y in range (9):
-                if input_data[x+y*9]==board._BLACK:
-                    board_to_predict[x+1][y+1][0] = 1
-                elif input_data[x+y*9]==board._WHITE:
-                    board_to_predict[x+1][y+1][1] = 1
-        board_to_predict = np.expand_dims(board_to_predict, axis=0)
-        value = None
-        if (self._mycolor == Goban.Board._BLACK):
-            value = self._model.predict(board_to_predict)[0][0]
-        else :
-            value = self._model.predict(board_to_predict)[0][1]
-        signal.siginterrupt(signal.SIGALRM, True)
-        return value
+        if board.is_game_over():
+            result = board.result()
+            if result == "1-0":
+                return self._mycolor == board._WHITE #print("WHITE")
+            elif result == "0-1":
+                return self._mycolor == board._BLACK
+            else:
+                return 0
+        return self.heuristique_simple(board)
     
     def __init__(self):
         self._board = Goban.Board()
         self._mycolor = None
         self._last_best_move = None
         self._play_time = 1 # to cover additional time we can't mesure.
-        self._phase = self.Strategy_Phase.First_Phase # TODO : change this
+        self._phase = self.Strategy_Phase.First_Phase
         self._model = load_model("my_model") # load Keras model
 
     def getRoundTime(self):
-        return min(10,(1800-self._play_time)/100)
+        return min(15,(1800-self._play_time)/50) # Il faut qu'il reste au moins le temps de faire 50 moves.
+        # 1800/15 = 120, raisonnable.
     
     def getWinnerColor(self,board):
         result = board.result()
@@ -85,9 +93,43 @@ class myPlayer(PlayerInterface):
     
     def getPlayerName(self):
         return "MinimaxPlayer"
+
+    def heuristique_simple(self,board):
+        assert(self._mycolor != None)
+        result = 10*board.diff_stones_board() - 5*board.diff_stones_captured()
+        if (self._mycolor == Goban.Board._BLACK):
+            return result
+        elif (self._mycolor == Goban.Board._WHITE):
+            return -result
+        return 0
+    
+    def heuristique_complexe(self,board):
+        assert(self._mycolor != None)
+        array = board.get_board()
+        holes_in_black = 0
+        holes_in_white = 0
+        for i in range(9):
+            for j in range(9):
+                if (array[i+9*j] == Goban.Board._EMPTY):
+                    if (((i == 0) or (array[(i-1)+9*j] == Goban.Board._BLACK))
+                        and ((i == 8) or (array[(i+1)+9*j] == Goban.Board._BLACK))
+                        and ((j == 0) or (array[i+9*(j-1)] == Goban.Board._BLACK))
+                        and ((j == 8) or (array[i+9*(j+1)] == Goban.Board._BLACK))):
+                        holes_in_black += 1
+                    elif (((i == 0) or (array[(i-1)+9*j] == Goban.Board._WHITE))
+                        and ((i == 8) or (array[(i+1)+9*j] == Goban.Board._WHITE))
+                        and ((j == 0) or (array[i+9*(j-1)] == Goban.Board._WHITE))
+                        and ((j == 8) or (array[i+9*(j+1)] == Goban.Board._WHITE))):
+                        holes_in_white += 1
+        result = holes_in_black - holes_in_white
+        if (self._mycolor == Goban.Board._BLACK):
+            return result + self.heuristique_simple(board)
+        elif (self._mycolor == Goban.Board._WHITE):
+            return -result + self.heuristique_simple(board)
+        return 0
         
     def handler(self,signum, frame):
-        raise TimeoutError("Timeout")
+        raise CustomException("Timeout")
     
     def simulateFriendlyMove(self,board,current_depth,max_depth,alpha,beta):
         if (current_depth>=max_depth or board._gameOver):
@@ -140,6 +182,13 @@ class myPlayer(PlayerInterface):
                     case 0:
                         self._phase = self.Strategy_Phase.Early_Game_Phase
                         return "E5"
+                    # case 1:
+                    #     self._phase = self.Strategy_Phase.MinMax_Phase
+                    #     match moves_history[0]:
+                    #         case "D5" | "E7" | "G5" | "E3":
+                    #             return "E4"
+                    #         case _:
+                    #             return "PASS" # à changer
                     case _:
                         self._phase = self.Strategy_Phase.Early_Game_Phase
                         return "PASS"
@@ -172,6 +221,9 @@ class myPlayer(PlayerInterface):
                             # si le premier joueur n'a pas joué dans la zone centrale
                             case _:
                                 return "E5"
+                    # case 1:
+                    #     self._phase = self.Strategy_Phase.MinMax_Phase
+                    #     return "A9"
                     case _:
                         self._phase = self.Strategy_Phase.Early_Game_Phase
                         return "PASS"
@@ -184,6 +236,7 @@ class myPlayer(PlayerInterface):
             best_move = self.playFirstPhase()
             self._board.push(Goban.Board.name_to_flat(best_move))
             return best_move
+        # if (self._phase == self.Strategy_Phase.MinMax_Phase):
         else:
             currentTime = time.time()
             if self._board.is_game_over():
@@ -193,29 +246,29 @@ class myPlayer(PlayerInterface):
             if (self._phase == self.Strategy_Phase.Early_Game_Phase):
                 moves = self.get_moves_from_center(2)
                 if (len(moves) <= 17):
+                    # sys.stderr.write(str(moves))
+                    # assert(False)
                     self._phase = self.Strategy_Phase.MinMax_Phase
             elif (self._phase == self.Strategy_Phase.MinMax_Phase):
                 moves = self._board.legal_moves() # Dont use weak_legal_moves() here!
             self._last_best_move = choice(moves) 
             max_depth = 1
+            original_sigalarm_handler = None
             try :
-                signal.signal(signal.SIGALRM, self.handler)
+                original_sigalarm_handler = signal.signal(signal.SIGALRM, self.handler)
                 signal.alarm(self.getRoundTime())
-                print("I'll have ",self.getRoundTime())
+                #print("I'll have this time to output something :",self.getRoundTime())
+                start_time = time.time()
                 while(True):
                     self._last_best_move = self.start_deep(copy.deepcopy(self._board),0,max_depth)
                     max_depth+=1
-            except TimeoutError:
+            except CustomException:
                 print("End of time ! Returning my best move.")
                 pass # if we do not use iterative deepening.
             finally:
-                signal.alarm(0)
+                signal.alarm(0)  # Cancel the alarm
                 print("I got to explore until " + str(max_depth-1))
                 self._board.push(self._last_best_move)
-                # Deepcopy allows to consider internal representations of moves
-                print("I am playing ", self._board.move_to_str(self._last_best_move))
-                print("My current board :")
-                self._board.prettyPrint()
                 self._play_time += time.time() - currentTime
                 print("Player time = " + str(self._play_time))
                 return Goban.Board.flat_to_name(self._last_best_move) 
@@ -232,3 +285,6 @@ class myPlayer(PlayerInterface):
             print("Minimax : I won!!!")
         else:
             print("Minimax : I lost :(!!")
+
+
+
