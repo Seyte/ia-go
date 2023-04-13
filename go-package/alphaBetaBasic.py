@@ -12,8 +12,6 @@ from playerInterface import *
 import signal
 import copy 
 import enum
-import sys
-from tensorflow.keras.models import load_model
 import numpy as np
 
 class CustomException(Exception):
@@ -50,7 +48,6 @@ class myPlayer(PlayerInterface):
         self._last_best_move = None
         self._play_time = 1 # to cover additional time we can't mesure.
         self._phase = self.Strategy_Phase.First_Phase
-        self._model = load_model("my_model") # load Keras model
 
     def getRoundTime(self):
         return min(15,(1800-self._play_time)/50) # Il faut qu'il reste au moins le temps de faire 50 moves.
@@ -257,8 +254,6 @@ class myPlayer(PlayerInterface):
             try :
                 original_sigalarm_handler = signal.signal(signal.SIGALRM, self.handler)
                 signal.alarm(self.getRoundTime())
-                #print("I'll have this time to output something :",self.getRoundTime())
-                start_time = time.time()
                 while(True):
                     self._last_best_move = self.start_deep(copy.deepcopy(self._board),0,max_depth)
                     max_depth+=1

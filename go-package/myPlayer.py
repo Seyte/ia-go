@@ -1,6 +1,6 @@
 import time
 import Goban 
-from random import choice, randint
+from random import choice
 from playerInterface import *
 import signal
 import copy 
@@ -18,12 +18,9 @@ class myPlayer(PlayerInterface):
         MinMax_Phase = 3
 
     def heuristic(self,board):
-        sigset = signal.sigset_t()
-        sigset.add(signal.SIGALRM)
-        oldset = signal.sigprocmask(signal.SIG_BLOCK, sigset)
+        old_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM})
         if board.is_game_over():
             return self.getWinnerColor(board)
-        print(board.get_board().shape)
         input_data = board.get_board()
         board_to_predict = np.zeros((11, 11, 2))
         for x in range (9):
@@ -35,10 +32,10 @@ class myPlayer(PlayerInterface):
         board_to_predict = np.expand_dims(board_to_predict, axis=0)
         value = None
         if (self._mycolor == Goban.Board._BLACK):
-            value = self._model.predict(board_to_predict)[0][0]
+            value = self._model.predict(board_to_predict,verbose=None)[0][0]
         else :
-            value = self._model.predict(board_to_predict)[0][1]
-        signal.sigprocmask(signal.SIG_SETMASK, oldset)
+            value = self._model.predict(board_to_predict,verbose=None)[0][1]
+        signal.pthread_sigmask(signal.SIG_SETMASK, old_mask)
         return value
     
     def __init__(self):
@@ -92,6 +89,8 @@ class myPlayer(PlayerInterface):
         return "MinimaxPlayer"
         
     def handler(self,signum, frame):
+        signal.signal(signal.SIGALRM, self.handler)
+        signal.alarm(1)
         raise TimeoutError("Timeout")
     
     def simulateFriendlyMove(self,board,current_depth,max_depth,alpha,beta):
@@ -207,11 +206,12 @@ class myPlayer(PlayerInterface):
             try :
                 signal.signal(signal.SIGALRM, self.handler)
                 signal.alarm(self.getRoundTime())
+                
                 print("I'll have ",self.getRoundTime())
                 while(True):
                     self._last_best_move = self.start_deep(copy.deepcopy(self._board),0,max_depth)
                     max_depth+=1
-            except TimeoutError:
+            except Exception as e:
                 print("End of time ! Returning my best move.")
                 pass # if we do not use iterative deepening.
             finally:
