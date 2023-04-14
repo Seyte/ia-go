@@ -20,3 +20,5 @@ Le défaut de cet algorithme est que notre joueur avait tendance à viser les bo
 Afin d'obtenir un joueur plus rapide, nous avons remplacé notre algorithme MinMax par une approche AlphaBeta.
 
 Finalement, nous avons remplacé notre heuristique par un réseau de neurones entraîné de manière similaire à celle du TP noté.
+
+Nous avons souhaité entraîner notre réseau sur une base de données plus grande que celle fournie dans le TP, nous avons donc simulé nous-mêmes des parties entre deux joueurs `gnugoPlayer`. Les détails de ce programme sont dans le fichier `dataset_building/make_dataset.py`. Malheureusement, nous avons créé très peu de parties supplémentaires de cette manière par manque de performance.
